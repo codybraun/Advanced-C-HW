@@ -1,0 +1,84 @@
+Homework 3
+MPCS 51100
+Due Date: Monday, November 17, 2014 @ 11:59 P.M CST
+
+The programs must compile with gcc and must be named p1.c, p2.c
+Email a .tar or .zip file <your_first_initial_and_last_name>.tar
+to Tim He at theshuo@gmail.com. Each program must compile with
+gcc on the MPCS cluster / lab computers.
+
+Be sure to specify your compilation options. IF YOUR CODE FAILS TO COMPILE, 
+AND THERE ARE NO PROVIDED INSTRUCTIONS, YOU WILL RECEIVE NO CREDIT.
+
+- You must include a README.txt file that lists your name, the assignment,
+and a discussion of any shortcomings your code may have. You will receive
+more partial credit if you are able to clearly identify faults or problems
+with your code, rather than letting us find them ourselves.
+
+- Homework is due at the time listed at the top of the assignment. Solutions
+will be released at the time homework is due; thus, under no circumstance will we 
+accept late homework assignments.
+
+- You are welcome to use any sources you wish (text-book, internet,
+etc) as references for this homework assignment. However, you MUST
+identify this reference as a comment in your source code file or
+README, along with the location from which it can be accessed (url,
+etc). Even more importantly -- all submitted work must be original.
+You are NOT allowed to copy verbatim any code from anywhere, even
+if you make a few alterations after copying.
+
+==============================================================================
+
+Implement two new versions of the dictionary from hw2
+ 1. Using a hashmap (p1)
+ 2. Using a self-balancing binary search tree (p2)
+
+Your dictionary must support:
+
+ %find [key]
+  * print value (definition) associated with key
+
+ %delete [key]
+  * removes key and associated value (definition) from dictionary
+
+ %insert [key] [value]
+  * add word/definition pair to the dictionary
+
+ %find [key1] [key2]
+  * print word/definition for each word between key1 and key2, inclusive
+
+ %print 
+  * print all word/definition pairs in alphabetical order of words
+
+ %read [filename]
+  * read in a plain text file of words and definitions and add them to the dictionary.
+    Assume that each distinct word and definition pair is on a separate line, the
+    word is separated from the definition by a single space and the definition is
+    enclosed in double quotes i.e.
+
+    word “this is the definition”
+    word2 “this is the second definition”
+
+You can assume no word will be longer than 50 characters, and no definition will be
+longer than 500 characters.
+
+Since hashmaps do not preserve key order, you will need to think about
+how to implement interval find and in order print functions. It is understood that 
+your solution will not be efficient for hashing, but it is expected to work correctly.
+
+Have your code create a log file (write to a text file) that produces the following at each insertion or deletion
+
+- for the tree, the tree depth
+- for the hash table, the load factor and occupancy
+
+Implement three different hashing algorithms h(k), chosen either from
+our class examples or from the course readings. Be clear about the
+chosen value of f in g that make up h -- ie h(k) = f(g(k)).
+
+The hashtable must support rehashing to potentially execute in
+O(1). You must choose a rehashing strategy and explain the choice.
+
+Benchmark your implementation against the test cases supplied and
+provide an overview of results. 
+
+Note that the provided tests are not necessarily the test files used for grading.

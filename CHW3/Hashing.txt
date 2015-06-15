@@ -1,0 +1,246 @@
+Consider a general Dictionary -- i.e. (key,value) pairs supporting 
+
+ -find
+ -insert
+ -delete
+
+With a balanced binary tree (e.g. R-B trees) we can do all of these
+operations in O[log n] time!  See more details in Brass Ch. 3.
+
+Note that for binary trees the keys have to be sortable
+
+In addition to find element, can also locate predecessor or successor
+element in O[log n] time, or similar operations like findmax and
+findmin.
+
+The key question today is: can we do better?
+
+-----------------------------
+Hashing
+
+Start with idea of direct addressing as a simple heuristic
+
+Idea is that there is a universe (discrete, countable, but large) set
+of integer keys, and those keys represent indices in a 1d array. insertions
+then simply map the key with its data to the associated array index.
+
+insert(3,data3);
+insert(1,data1)
+etc.
+
+We will be consistent with the following notation:
+N: total keys in universe of keys (integers for now)
+M: number of entries direct address table
+n: number of keys in use at any point during building of a specific dictionary.
+
+Assume in this heuristic that N=M -- i.e. one table entry per key in
+the Universe of keys.
+
+Then find, insert, and delete are all O(1) operations: simply store or
+retrieve the key from the associated index in the table.
+
+what is wrong with this simple model?
+
+Two key issues:
+
+1. Keys are not necessarily integers
+ symbols <-> addresses
+ address <-> malloc'ed block size
+ string  <-> string
+
+ endless examples of why you want associative arrays beyond indexing
+ with integer values.
+
+
+2. Table would be a huge memory hog to accommodate all keys N. Note
+that at any time only a (likely very small) subset of keys are in
+table at a given time (not that it would even be feasible to build
+entire table anyhow, but even if so it would be massively wasteful).
+
+
+Try something different. Assume that M << N -- i.e. there are many
+fewer table entries than possible keys.
+
+What does this imply? 
+ -conflicts -- multiple keys necessary map to the same table entry
+
+How do we resolve conflicts?
+ -chaining  (recommended)
+  make each bucket a linked list and store conflicts within the list
+ -open addressing 
+  use nearby empty entries: powerful idea, but more limited in practice
+
+
+Now, break the problem up into two parts:
+
+Let h(k) be the hash function that produces an in-range integer value
+for an arbitrary key k. Write this as the composition of two
+functions, reflecting the two steps described above
+
+  h(k) = g(f(k))
+  
+  f(k): converts k to integer value (somehow) ("prehashing")
+  g(k): maps integer key (can be anything) into valid table range ("hashing")
+
+Note that these two steps are not necessarily fully independent in
+practice, but it is very useful conceptually to separate them (many
+texts don't).
+
+Let's start with h(k)
+
+Again, let N be size of key universe, n be number of keys in use at
+any point, and M be the table size.
+
+Assuming the object has been prehashed, how can we ensure that it fits
+in table?
+
+Simple uniform hashing model: assume h maps key to uniform random
+place independent of any other key. Not typically achievable in
+practice but good conceptual model.
+
+In that case load factor -- i.e. expected number of conflicts in a
+bucket, is just n/M.
+
+In reality almost any set of keys are going to result in biased
+selection from the universe of possible keys -- i.e. they tend to
+share properties -- might be # of digits (e.g. zip codes or social
+security numbers), odd vs. even, powers of two, same initial digits
+(e.g. area codes) etc.
+
+Some simple hashing functions f(k)
+
+1. Division method
+ f(k) = k mod M
+
+what does it do?
+
+-fine if k's are chosen totally randomly (not true in practice, many
+ apps cluster keys)
+
+-note e.g. h is even if k is even
+           h is odd  if k is odd
+
+ if we had affinity for even keys, only half of table would be used
+ (not good, want to spread out)
+
+when is it bad?
+Imagine M is a power of 2 (typical) = 2^l, l > 1
+ - k mod M only strips retains last l bits. 
+ - can be bad for spreading for certain key families
+One solution: choose M as prime, will ensure greater spread out
+ k/M depends on all bits of k
+
+
+Middle Square method
+
+The middle-square hashing method works as follows. First, we assume
+ that M is a power of two, say M = 2^l for some l >= 1. Then, to hash
+ an integer x, we use the following hash function:
+    h(k) = M/W(k^2 mod W)
+unsigned int const k = 10; // M==1024
+unsigned int const w = bitsizeof (unsigned int);
+
+unsigned int h (unsigned int x){ return (x * x) >> (w - k); }
+
+Notice that since M and W are both powers of two, the ratio W/M =
+2^{w-l} is also a power two. Therefore, in order to multiply the term
+(x^2 mod W) by M/W we simply shift it to the right by w-k bits! In
+effect, we are extracting k bits from the middle of the square of the
+key--hence the name of the method.
+
+
+We discuss rehashing, string hash functions, and universal hashing
+next time. below is a simple implementation of a chained hash table
+in C, using the division method as the choice of f with a user-input
+value of g.
+
+/*-------------------------------------------------------------
+
+Sample Implementation of a Chained Hashtable Note that we simplify as
+with trees to assume key = data, so we simply hash objects directly
+into a table Also note that the hash function h supplied by the user
+is really g(k) according to above discussion, and f(k) is built-in
+(the division method). Also, rehashing is not done within this code --
+the table is allocated for the specified bucket size. Any rehashing would
+have to be done in an outer loop around this routine.
+
+Header file  + sample insert routine
+
+#include "list.h"       /* assume list implementation */
+
+typedef struct CHTbl_ {
+  int                        buckets; /* M in class terminology */
+  int                        (*h)(const void *key); /* this is just g, f is built in */
+  int                        (*match)(const void *key1, const void *key2);
+  void                       (*destroy)(void *data);
+  int                        size; /* n in class terminology */
+  List                       *table; /* array of List type -- one per bucket */
+} CHTbl;
+
+int chtbl_init(CHTbl *htbl, int buckets, int (*h)(const void *key), int        
+	       (*match)(const void *key1, const void *key2), void (*destroy)(void *data));
+void chtbl_destroy(CHTbl *htbl);
+int chtbl_insert(CHTbl *htbl, const void *data);
+int chtbl_remove(CHTbl *htbl, void **data);
+int chtbl_lookup(const CHTbl *htbl, void **data);
+#define chtbl_size(htbl) ((htbl)->size)
+
+#include<stdlib.h>
+#include<string.h>
+
+#include "chtbl.h"
+
+int chtbl_init(CHTbl *htbl, int buckets, int (*h)(const void *key),
+	       int (*match)(const void *key1, const void *key2),
+	       void (*destroy)(void *data)){
+  int i;
+
+  if ((htbl->table = (List *) malloc(buckets*sizeof(List))) == NULL)
+    return -1;
+  
+  htbl->buckets = buckets;
+  
+  for (i = 0; i < htbl->buckets; i++)
+    list_init(&htbl->table[i], NULL, NULL);
+  
+  htbl->h = h;
+  htbl->destroy = NULL;
+  htbl->match = match;
+  htbl->size = 0;
+  return 0;
+}
+
+/* insert an object into the hashtable */
+int chtbl_insert(CHTbl *htbl, const void *data){
+  int error_code;
+  int bucket;
+
+  if (chtbl_lookup(htbl,(void **) &data) == 0) /*data already in table */
+    return 1;
+
+  /* data not in table, find bucket to place it in */
+  /* note that f, in particular the division method, is hardwired
+     into the line below as the mod operation
+  */
+  bucket = htbl->h(data) % htbl->buckets; 
+  
+  if ((error_code = list_ins_next(&htbl->table[bucket], NULL, data)) == 0)
+    htbl->size++;
+
+  return error_code;
+}
+
+int chtbl_lookup(const CHTbl *htbl, void **data){
+  ListElmt *element;
+  int bucket;
+  bucket = htbl->h(*data)%htbl->buckets; /* apply user's g and hardwired f */
+  for (element = list_head(&htbl->table[bucket]); element != NULL; element =
+	 list_next(element)) {
+    if (htbl->match(*data, list_data(element))) {
+      *data = list_data(element); /* set pointer to point to object found in table */
+      return 0;
+    }
+  }
+  return -1;
+}
+

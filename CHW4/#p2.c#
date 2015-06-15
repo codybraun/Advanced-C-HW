@@ -1,0 +1,231 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#define OMP_NUM_THREADS 4
+#define MAXINT 10000000
+
+typedef struct graph_ {
+    int vCount;
+    int  ** weights;
+    int ** adj;
+} graph;
+
+graph * nGraph() {
+    graph * tGraph = malloc(sizeof(graph));
+    tGraph->vCount = 0;
+    tGraph -> weights = NULL;
+    tGraph -> adj = NULL;
+    return tGraph;
+}
+
+int * dijkstra (int s, graph * x)
+{
+    int * dists, i, j, k, min, y, lc, gc, lcv, gcv, firstV, lastV;
+    int * done;
+    done = malloc (sizeof(int)*x->vCount);
+    i =0;
+    dists = malloc (x->vCount * sizeof(int));
+
+    for (i=0; i<x->vCount; i++)
+    {
+        dists[i]= MAXINT;
+        done[i]= 0;
+    }
+    dists[s] = 0;
+    i = s;
+
+    #pragma omp parallel private(j, firstV, lastV, lc, lcv, k) shared (i, dists, done, gc, gcv, x)
+    {
+        firstV =0;
+        lastV=0;
+        j=0;
+        i=0;
+        k=0;
+        gc = 0;
+        printf ("vCount is %d thread number is %d and number theeads is %d \n", x->vCount, omp_get_thread_num(), OMP_NUM_THREADS);
+        firstV = (omp_get_thread_num() * x->vCount) / OMP_NUM_THREADS;
+        lastV = (((omp_get_thread_num() + 1) * x->vCount) / OMP_NUM_THREADS) -1;
+        printf ("Thread %d is getting vertex %d through %d \n", omp_get_thread_num(), firstV, lastV);
+        #pragma omp barrier
+        printf("x->vcount is %d \n", x->vCount);
+        for (k=0; k < x->vCount; k++)	/*run v total times through*/
+        {
+            lcv = MAXINT;	/*reset local closest vertex*/
+
+            #pragma omp single
+            {
+                printf("thread %d is resetting gcv \n", omp_get_thread_num());
+                gcv = MAXINT;
+            }
+            printf ("j is %d and i is %d", j, i);
+            for (j=firstV; j<= lastV; j++)
+            {
+                /*printf ("adj[%d][%d] is %d", i, j,x->adj[i][j]);*/
+                if (x->adj[i][j]!=0)
+                {
+                    printf ("found edge from %d to %d \n", i, j);
+                    if (dists[i] + x->weights[i][j] < dists[j])
+                    {
+                        printf ("relaxing edge from %d to %d \n", i, j);
+                        dists[j]= dists[i] + x->weights[i][j];
+                        #pragma omp critical
+                        {
+                            if (done[j] ==0 && dists[j] < lcv) {	/*if j isn't completed and is lower than than current lowest value, update*/
+                                printf ("thread %d updating lcv \n", omp_get_thread_num());
+                                lcv = dists[j];
+                                lc = j;
+                                if (gcv > lcv) {
+                                    printf ("thread %d updating gcv \n", omp_get_thread_num());
+                                    gcv = lcv;
+                                    gc = lc;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            #pragma omp barrier
+            i = gc;
+            done[i] = 1;
+
+        }
+
+    }
+    return dists;
+}
+
+int ** sps (graph * x)
+{
+    int ** distArray;
+    distArray = malloc (x->vCount * sizeof(int*));
+    int i;
+    distArray[0]= dijkstra(0, x);
+
+    return distArray;
+}
+
+graph * read (char * fileName, int print)
+{
+    char * item, * item2, * item3, * item4;
+    FILE * graphFile = fopen(fileName, "r");
+    graph * x;
+    int ** adjList, ** weights, i, n, j;
+    item = malloc(60);
+    fgets (item, 60, graphFile);
+    x = nGraph();
+
+    n = atoi(item);
+    x->vCount = n;
+
+    weights = (int **) malloc(n*sizeof(int*));
+    adjList = (int **) malloc(n*sizeof(int*));
+    for(i=0; i<n; i++) {
+        weights[i] = (int *) malloc (n*sizeof(int));
+        adjList[i] = (int *) malloc (n*sizeof(int));
+
+    }
+
+    x->adj = adjList;
+    x->weights = weights;
+    for (i=0; i<n; i++)
+    {
+        for (j=0; j<n; j++)
+        {
+            weights[i][j]=0;
+            adjList[i][j]=0;
+        }
+    }
+
+    while (fgets (item, 60, graphFile) >0)
+    {
+        item2 = strtok(item, " ");
+        item3 = strtok(NULL, " ");
+        item4 = strtok(NULL, " ");
+        adjList[atoi(item2)][atoi(item3)] = 1;
+        adjList[atoi(item3)][atoi(item2)] = 1;
+        weights[atoi(item3)][atoi(item2)] = atoi(item4);
+        weights[atoi(item2)][atoi(item3)] = atoi(item4);
+    }
+
+    fclose(graphFile);
+    printf ("scanned graph");
+    return x;
+}
+
+int main (int argc, char** argv) {
+
+    char input[50];
+    char * fInput[50];
+    FILE * graphFile;
+    int exit = 0;
+    int ** distArray, i, j;
+    graph * x;
+    while (exit != 1)
+    {
+        printf ("\nEnter a command: ");
+        fgets(input, 60, stdin);
+        fInput[0] = strtok(input, " ");
+        fInput[1] = strtok(NULL, "\n");
+
+        if (strcmp (fInput[0], "read")==0) {
+            if (fInput[1]==NULL)
+            {
+                fInput[1]="";
+            }
+            x = read (fInput[1], 0);
+            distArray= sps(x);
+        }
+
+
+        else if (strcmp (fInput[0], "print")==0) {
+            if (fInput[1]==NULL)
+            {
+                fInput[1]="";
+            }
+            x = read (fInput[1], 0);
+            distArray= sps(x);
+
+            for (i=0; i< x->vCount; i++) {
+                for (j=0; j< x->vCount; j++) {
+                    printf (" [ %d ]", distArray[i][j]);
+                }
+                printf ("\n");
+            }
+
+        }
+
+    }
+    return 0;
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
